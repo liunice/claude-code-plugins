@@ -22,12 +22,14 @@ User query
     |
 [Phase 2] Query decomposition & expansion -> generate sub-queries
     |
-[Phase 3] Multi-source parallel search -> search.py (Brave+Exa+Tavily+Grok+Twitter)
+[Phase 3] Multi-source parallel search -> search.py / twitter_search.py
+    ├── [3.1] Twitter/X operations (when targeting X content)
+    └── [3.2] Reference tracking (when results contain thread links)
     |
-[Phase 4] Merge & rank -> dedup + intent-weighted scoring
-    |
-[Phase 5] Knowledge synthesis -> structured output
+[Phase 4] Ranking & synthesis -> dedup + scoring + structured output
 ```
+
+> Jump to [Quick Reference](#quick-reference) for common commands.
 
 ---
 
@@ -131,9 +133,13 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
 - Delegates to `twitter_search.py` module internally
 - Paid API — use `--twitter-max-queries N` (default 3) to control cost per invocation
 
----
+### Degradation strategy
 
-## Phase 3.1: Twitter/X Operations
+- Any single source fails -> continue with remaining sources
+- search.py entirely fails -> inform user and suggest retrying
+- **Never block the main flow because one source fails**
+
+### Phase 3.1: Twitter/X Operations
 
 For queries targeting X/Twitter content, use `twitter_search.py` directly.
 
@@ -155,14 +161,20 @@ For queries targeting X/Twitter content, use `twitter_search.py` directly.
 
 **Routing hints — `user-tweets` vs `search --from`:**
 - **`user-tweets` does NOT support time or keyword filtering.** It only returns the N most recent tweets.
-- When the query includes a time constraint (e.g. "last 24 hours", "this week") or a keyword, always use `search --from {handle}` with `--within` instead of `user-tweets`.
+
+| Need | Use | Why |
+|------|-----|-----|
+| Latest tweets from a user (no filtering) | `user-tweets` | Timeline endpoint, chronological order |
+| A user's tweets about a specific topic | `search --from` | Supports keyword filtering |
+| A user's tweets within a time range | `search --from` | Supports `--within` for relative time |
+| A user's tweets including replies | `user-tweets --include-replies` | Only `user-tweets` supports this |
 
 **Routing hints — `trends` vs `search`:**
 - **`trends` returns topic names, NOT actual tweets.** Use it to discover what's trending, then follow up with `search` if the user wants actual tweet content.
 - When the user asks for "popular/hot/trending" **tweets** in a location without a specific keyword, use the two-phase workflow: (1) call `trends --woeid {id}` to get trending topic names, (2) combine the top topic names with `OR` into a single `search` call with `--query-type Top`.
 - When the user asks for tweets **about a specific topic** (e.g. "popular tweets about AI"), use `search` with `--query-type Top` directly — no need for `trends`.
 
-### twitter_search.py subcommands
+#### twitter_search.py subcommands
 
 ```bash
 # Search tweets by keyword (last 24 hours)
@@ -204,6 +216,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
 | `--include-replies` | Include replies (default: exclude) |
 | `--num` | Max results (default: 5) |
 
+**`trends` parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--woeid` | Where On Earth ID (default: 1 = Worldwide) |
+| `--num` | Max trends to return (default: 5) |
+
+**Common woeid values**: Worldwide (1), US (23424977), UK (23424975), Japan (23424856), China (23424748). See `references/woeid-table.md` for the full table.
+
 **Two-phase workflow example** ("get OpenAI's latest tweet"):
 
 ```
@@ -225,44 +246,6 @@ Phase 2 — Search top tweets for those topics (use Twitter API):
   twitter_search.py search "TopicA OR TopicB OR TopicC" --query-type Top --within 24h --num 5
 ```
 
-**`trends` parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `--woeid` | Where On Earth ID (default: 1 = Worldwide) |
-| `--num` | Max trends to return (default: 5) |
-
-**Common woeid values**:
-
-| woeid | Location |
-|-------|----------|
-| 1 | Worldwide |
-| 23424977 | United States |
-| 23424975 | United Kingdom |
-| 23424856 | Japan |
-| 23424748 | China |
-| 23424868 | South Korea |
-| 23424829 | Germany |
-| 23424819 | France |
-| 23424848 | India |
-| 23424775 | Canada |
-| 23424900 | Mexico |
-| 23424768 | Brazil |
-| 23424803 | Ireland |
-| 23424750 | Australia |
-| 23424873 | Singapore |
-
-Full woeid list: https://gist.github.com/tedyblood/5bb5a9f78314cc1f478b3dd7cde790b9
-
-**`user-tweets` vs `search --from` — when to use which:**
-
-| Need | Use | Why |
-|------|-----|-----|
-| Latest tweets from a user (no filtering) | `user-tweets` | Timeline endpoint, chronological order |
-| A user's tweets about a specific topic | `search --from` | Supports keyword filtering |
-| A user's tweets within a time range | `search --from` | Supports `--within` for relative time |
-| A user's tweets including replies | `user-tweets --include-replies` | Only `user-tweets` supports this |
-
 **Important notes:**
 - Uses [twitterapi.io](https://twitterapi.io) API (NOT the official X/Twitter API). Requires `TWITTER_API_KEY`.
 - Paid API — minimize calls. When the handle is already known or can be confidently inferred, skip Phase 1 and call `user-tweets` directly.
@@ -271,17 +254,17 @@ Full woeid list: https://gist.github.com/tedyblood/5bb5a9f78314cc1f478b3dd7cde79
 
 ---
 
-## Phase 3.5: Reference Tracking (Thread Pulling)
+### Phase 3.2: Reference Tracking (Thread Pulling)
 
 When results contain GitHub issue/PR links and intent is Status or Exploratory, auto-trigger reference tracking.
 
-### search.py --extract-refs (batch)
+#### search.py --extract-refs (batch)
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py "query" --mode deep --intent status --extract-refs
 ```
 
-### fetch_thread.py (single URL deep fetch)
+#### fetch_thread.py (single URL deep fetch)
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/fetch_thread.py "https://github.com/owner/repo/issues/123" --format json
@@ -291,7 +274,7 @@ Supports: GitHub issues/PRs, HN, Reddit, V2EX, generic web pages.
 
 ---
 
-## Phase 4: Result Ranking
+## Phase 4: Ranking & Synthesis
 
 ### Scoring formula
 
@@ -302,10 +285,6 @@ score = w_keyword * keyword_match + w_freshness * freshness_score + w_authority 
 Weights are determined by intent (see Phase 1 table).
 
 > See `references/authority-domains.json` for the full domain scoring table.
-
----
-
-## Phase 5: Knowledge Synthesis
 
 ### Sources summary (MUST display)
 
@@ -335,14 +314,6 @@ When results include Twitter data, the `title` field contains engagement metrics
 - **Group by topic, not by source**
 - **Flag conflicting info** from different sources
 - **Confidence expression**: multi-source agreement -> direct statement; single source -> cite it; conflict -> present both
-
----
-
-## Degradation Strategy
-
-- Any single source fails -> continue with remaining sources
-- search.py entirely fails -> inform user and suggest retrying
-- **Never block the main flow because one source fails**
 
 ---
 
