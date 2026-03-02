@@ -1,0 +1,10 @@
+{
+  "name": "search-skills",
+  "version": "1.0.0",
+  "description": "Multi-source search (Brave+Exa+Tavily+Grok) with intelligent content extraction (trafilatura+MinerU). Intercepts WebSearch/WebFetch and routes to Python scripts.",
+  "author": {
+    "name": "liunice"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/liunice/claude-code-plugins/tree/main/plugins/search-skills"
+}

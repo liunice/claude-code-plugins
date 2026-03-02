@@ -1,0 +1,25 @@
+{
+  "description": "Intercept WebSearch/WebFetch and redirect to search-skills Python scripts",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/websearch_to_search_layer.py"
+          }
+        ]
+      },
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/webfetch_to_content_extract.py"
+          }
+        ]
+      }
+    ]
+  }
+}

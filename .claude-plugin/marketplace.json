@@ -1,0 +1,17 @@
+{
+  "name": "liunice-plugins",
+  "description": "Claude Code plugin marketplace — multi-source search and more",
+  "version": "1.0.0",
+  "license": "MIT",
+  "homepage": "https://github.com/liunice/claude-code-plugins",
+  "owner": {
+    "name": "liunice"
+  },
+  "plugins": [
+    {
+      "name": "search-skills",
+      "source": "./plugins/search-skills",
+      "description": "Multi-source search (Brave+Exa+Tavily+Grok) with intelligent content extraction (trafilatura+MinerU)"
+    }
+  ]
+}
