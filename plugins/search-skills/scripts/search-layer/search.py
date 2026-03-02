@@ -12,7 +12,7 @@ Sources:
   Grok   - xAI model via OpenAI-compatible completions API, strong real-time knowledge
 
 Modes:
-  fast   - single source only (Tavily preferred, then Exa, then Brave, then Grok)
+  fast   - single source only (Exa preferred, then Brave, then Grok)
   deep   - all configured sources in parallel (max coverage)
   answer - Tavily search (includes AI-generated answer with citations)
 
@@ -644,13 +644,10 @@ def execute_search(query: str, mode: str, keys: dict, num: int,
         return result, elapsed
 
     if mode == "fast":
-        # Fast mode: single source, preference order: tavily > exa > brave > grok
+        # Fast mode: single source, preference order: exa > brave > grok
+        # Tavily is excluded — its strength (AI answer) is reserved for answer mode.
         chosen = None
-        if "tavily" in keys and _want("tavily"):
-            chosen = "tavily"
-            res, elapsed = _timed(search_tavily, query, keys["tavily"], num, False, freshness, search_timeout)
-            all_results = res
-        elif "exa" in keys and _want("exa"):
+        if "exa" in keys and _want("exa"):
             chosen = "exa"
             res, elapsed = _timed(search_exa, query, keys["exa"], num, search_timeout)
             all_results = res

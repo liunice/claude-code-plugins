@@ -85,7 +85,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
 
 | Mode | Brave | Exa | Tavily | Grok | Notes |
 |------|-------|-----|--------|------|-------|
-| fast | fallback | fallback | preferred | fallback | Single source: tavily > exa > brave > grok |
+| fast | fallback | preferred | - | fallback | Single source: exa > brave > grok (Tavily reserved for answer mode) |
 | deep | yes | yes | yes | yes | All configured sources in parallel |
 | answer | - | - | yes | - | Tavily only (includes AI answer) |
 

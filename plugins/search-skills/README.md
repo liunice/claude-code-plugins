@@ -85,7 +85,7 @@ The `search.py` script supports three search modes, automatically selected based
 
 | Mode | Behavior | Use case |
 |------|----------|----------|
-| `fast` | Single source only (tavily > exa > brave > grok) | Quick resource lookups, finding official docs/sites |
+| `fast` | Single source only (exa > brave > grok) | Quick resource lookups, finding official docs/sites |
 | `deep` | All configured sources in parallel | Research, comparisons, status updates, news (default) |
 | `answer` | Tavily only, with AI-generated answer | Factual questions, how-to queries |
 
