@@ -148,10 +148,14 @@ For queries targeting X/Twitter content, use `twitter_search.py` directly.
 | Scenario | Example | Workflow |
 |----------|---------|----------|
 | **Get a specific account's tweets** | "OpenAI latest tweet", "what did Elon Musk post on X" | Two-phase: (1) find handle via regular web search (search.py), (2) call `user-tweets` |
+| **Get a specific account's tweets with time/keyword filter** | "OpenAI tweets in last 24h", "Elon Musk's tweets about AI" | Single-phase: call `search` with `--from` (+ `--within` and/or keyword) |
 | **Search tweet content by keyword** | "AI trending on X", "tweets about GPT-5" | Single-phase: call `search` directly |
-| **Search with author + keyword** | "Elon Musk's tweets about AI" | Single-phase: call `search` with `--from` |
 | **Get trending topics** | "Twitter trends", "trending on X", "what's hot on X" | Single-phase: call `trends` directly |
 | **Get top tweets in a region** | "top tweets in US", "most popular tweets in Japan" | Two-phase: (1) `trends` with woeid to get topic names, (2) `search` with those topics |
+
+**Routing hints — `user-tweets` vs `search --from`:**
+- **`user-tweets` does NOT support time or keyword filtering.** It only returns the N most recent tweets.
+- When the query includes a time constraint (e.g. "last 24 hours", "this week") or a keyword, always use `search --from {handle}` with `--within` instead of `user-tweets`.
 
 **Routing hints — `trends` vs `search`:**
 - **`trends` returns topic names, NOT actual tweets.** Use it to discover what's trending, then follow up with `search` if the user wants actual tweet content.
@@ -161,13 +165,13 @@ For queries targeting X/Twitter content, use `twitter_search.py` directly.
 ### twitter_search.py subcommands
 
 ```bash
-# Search tweets by keyword (with optional filters)
+# Search tweets by keyword (last 24 hours)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
-  search "AI news" --since 2026-03-01 --num 5
+  search "AI news" --within 24h --num 5
 
-# Search a specific author's tweets about a topic
+# Search a specific author's tweets about a topic (last 30 days)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
-  search "GPT-5" --from openai --since 2026-01-01
+  search "GPT-5" --from openai --within 30d
 
 # Get a user's latest tweets (by handle)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
@@ -188,8 +192,7 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
 |-----------|-------------|
 | `query` (positional) | Search keywords |
 | `--from` | Filter by author handle (without @) |
-| `--since` | Start date (YYYY-MM-DD) |
-| `--until` | End date (YYYY-MM-DD) |
+| `--within` | Relative time window: `24h`, `7d`, `30d`, etc. Maps to Twitter's `within_time:` operator |
 | `--query-type` | Latest (default) / Top |
 | `--num` | Max results (default: 5, API max: 20) |
 
@@ -219,7 +222,7 @@ Phase 1 — Get trending topics (use Twitter API):
   → extracts topic names, e.g. ["TopicA", "TopicB", "TopicC", ...]
 
 Phase 2 — Search top tweets for those topics (use Twitter API):
-  twitter_search.py search "TopicA OR TopicB OR TopicC" --query-type Top --since 2026-03-02 --num 5
+  twitter_search.py search "TopicA OR TopicB OR TopicC" --query-type Top --within 24h --num 5
 ```
 
 **`trends` parameters:**
@@ -257,7 +260,7 @@ Full woeid list: https://gist.github.com/tedyblood/5bb5a9f78314cc1f478b3dd7cde79
 |------|-----|-----|
 | Latest tweets from a user (no filtering) | `user-tweets` | Timeline endpoint, chronological order |
 | A user's tweets about a specific topic | `search --from` | Supports keyword filtering |
-| A user's tweets within a date range | `search --from` | Supports `--since` / `--until` |
+| A user's tweets within a time range | `search --from` | Supports `--within` for relative time |
 | A user's tweets including replies | `user-tweets --include-replies` | Only `user-tweets` supports this |
 
 **Important notes:**
@@ -352,7 +355,7 @@ When results include Twitter data, the `title` field contains engagement metrics
 | Latest updates | `search.py "query" --mode deep --intent status --freshness pw` |
 | Comparison | `search.py --queries "A vs B" "A pros" "B pros" --intent comparison` |
 | Find resource | `search.py "query" --mode fast --intent resource` |
-| Twitter: keyword search | `twitter_search.py search "AI news" --since 2026-03-01 --num 5` |
+| Twitter: keyword search | `twitter_search.py search "AI news" --within 24h --num 5` |
 | Twitter: author + topic | `twitter_search.py search "GPT-5" --from openai` |
 | Twitter: user's latest | `twitter_search.py user-tweets --username openai --num 1` |
 | Twitter: trending topics | `twitter_search.py trends --woeid 1 --num 5` |

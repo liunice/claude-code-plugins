@@ -11,15 +11,15 @@ Three subcommands:
 API docs: https://docs.twitterapi.io/
 
 Usage:
-  # Keyword search
-  python3 twitter_search.py search "AI news" --since 2026-03-01 --num 5
+  # Keyword search (last 24 hours)
+  python3 twitter_search.py search "AI news" --within 24h --num 5
 
   # Combine variants with OR to reduce API calls
-  python3 twitter_search.py search '"GPT 5.4" OR "GPT-5.4"' --since 2026-03-01 --num 10
+  python3 twitter_search.py search '"GPT 5.4" OR "GPT-5.4"' --within 7d --num 10
 
   # Filter by author (with or without keyword)
-  python3 twitter_search.py search "GPT-5" --from openai --since 2026-01-01
-  python3 twitter_search.py search --from elonmusk --since 2026-02-01 --num 10
+  python3 twitter_search.py search "GPT-5" --from openai --within 30d
+  python3 twitter_search.py search --from elonmusk --within 7d --num 10
 
   # Get a user's latest tweets
   python3 twitter_search.py user-tweets --username openai --num 1
@@ -133,8 +133,7 @@ def _parse_tweet(tweet: dict) -> dict:
 # ---------------------------------------------------------------------------
 def tweet_search(query: str | None, api_key: str, *,
                  author: str = None,
-                 since: str = None,
-                 until: str = None,
+                 within: str = None,
                  query_type: str = "Latest",
                  num: int = 5,
                  timeout: int = 30,
@@ -145,8 +144,7 @@ def tweet_search(query: str | None, api_key: str, *,
         query: Search keywords.
         api_key: twitterapi.io API key.
         author: Filter by author handle (without @).
-        since: Start date, YYYY-MM-DD format.
-        until: End date, YYYY-MM-DD format.
+        within: Relative time window, e.g. "24h", "7d", "30d".
         query_type: "Latest" or "Top".
         num: Max results to return (API returns up to _API_MAX_PER_PAGE (20) per page).
         timeout: HTTP request timeout in seconds.
@@ -163,10 +161,8 @@ def tweet_search(query: str | None, api_key: str, *,
         parts = [query] if query else []
         if author:
             parts.append(f"from:{author}")
-        if since:
-            parts.append(f"since:{since}")
-        if until:
-            parts.append(f"until:{until}")
+        if within:
+            parts.append(f"within_time:{within}")
 
         data = _api_get("/twitter/tweet/advanced_search", api_key, {
             "query": " ".join(parts),
@@ -288,10 +284,8 @@ def main():
                            help="Search keywords (optional if --from is specified)")
     sp_search.add_argument("--from", dest="author", default=None,
                            help="Filter by author handle (without @)")
-    sp_search.add_argument("--since", default=None,
-                           help="Start date (YYYY-MM-DD)")
-    sp_search.add_argument("--until", default=None,
-                           help="End date (YYYY-MM-DD)")
+    sp_search.add_argument("--within", default=None,
+                           help="Relative time window, e.g. 24h, 7d, 30d")
     sp_search.add_argument("--query-type", choices=["Latest", "Top"], default="Latest",
                            help="Sort order (default: Latest)")
     sp_search.add_argument("--num", type=int, default=5,
@@ -328,8 +322,7 @@ def main():
         results = tweet_search(
             args.query, api_key,
             author=args.author,
-            since=args.since,
-            until=args.until,
+            within=args.within,
             query_type=args.query_type,
             num=args.num,
         )
@@ -338,8 +331,7 @@ def main():
             "query": args.query,
             "filters": {
                 "author": args.author,
-                "since": args.since,
-                "until": args.until,
+                "within": args.within,
                 "query_type": args.query_type,
             },
             "count": len(results),
