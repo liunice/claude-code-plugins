@@ -6,7 +6,7 @@ Based on [openclaw-search-skills](https://github.com/blessonism/openclaw-search-
 
 ## Features
 
-- **4-source parallel search**: Brave + Exa + Tavily + Grok
+- **5-source parallel search**: Brave + Exa + Tavily + Grok + Twitter (Twitter is opt-in)
 - **Intent-aware scoring**: 7 intent types with adaptive weights
 - **Smart content extraction**: trafilatura probe with MinerU fallback
 - **Thread pulling**: Recursive reference tracking for GitHub issues, HN, Reddit, V2EX
@@ -57,19 +57,23 @@ Run `/search-skills:setup` for guided configuration, or see `.env.example` for t
 | `GROK_API_KEY` | At least one of four | — | [xAI Grok](https://docs.x.ai/docs/overview) API key |
 | `GROK_API_URL` | No | `https://api.x.ai/v1` | Grok API base URL (OpenAI-compatible endpoint) |
 | `GROK_MODEL` | No | `grok-4.20-beta` | Grok model name |
+| `TWITTER_API_KEY` | No (opt-in) | — | [twitterapi.io](https://twitterapi.io) API key (NOT the official X/Twitter API) |
 | `GROK_TIMEOUT` | No | `120` | Grok API request timeout in seconds |
 | `SEARCH_TIMEOUT` | No | `30` | Brave/Exa/Tavily API request timeout in seconds |
 | `MINERU_TOKEN` | No | — | [MinerU](https://mineru.net/apiManage) bearer token (for anti-crawl/PDF scenarios) |
 
-> **Note:** At least one search source API key must be configured. Sources without keys are silently skipped. If none are configured, the search script exits with an error.
+> **Note:** At least one standard search source API key (Brave/Exa/Tavily/Grok) must be configured. Sources without keys are silently skipped. Twitter is opt-in and cannot serve as the sole source.
 
 > **Note:** Grok uses the [OpenAI-compatible Chat Completions API](https://docs.x.ai/docs/guides/using_openai_sdk). Any OpenAI-compatible endpoint can be used by setting `GROK_API_URL`.
+
+> **Note:** Twitter is an **opt-in** source — it never runs by default. Use `--source twitter` to explicitly include it. The API key is from [twitterapi.io](https://twitterapi.io), a third-party service, NOT the official X/Twitter API.
 
 ## Scripts
 
 | Script | Purpose |
 |--------|---------|
 | `scripts/search-layer/search.py` | Multi-source search with intent-aware scoring |
+| `scripts/search-layer/twitter_search.py` | Twitter/X operations: tweet search, user tweets (via [twitterapi.io](https://twitterapi.io)) |
 | `scripts/search-layer/fetch_thread.py` | Deep thread fetcher (GitHub, HN, Reddit, V2EX, web) |
 | `scripts/search-layer/chain_tracker.py` | Recursive reference chain tracker |
 | `scripts/search-layer/relevance_gate.py` | LLM-based relevance scoring for chain tracking |
@@ -86,7 +90,7 @@ The `search.py` script supports three search modes, automatically selected based
 | Mode | Behavior | Use case |
 |------|----------|----------|
 | `fast` | Single source only (exa > brave > grok) | Quick resource lookups, finding official docs/sites |
-| `deep` | All configured sources in parallel | Research, comparisons, status updates, news (default) |
+| `deep` | All configured standard sources in parallel; opt-in sources (e.g. Twitter) only with explicit `--source` | Research, comparisons, status updates, news (default) |
 | `answer` | Tavily only, with AI-generated answer | Factual questions, how-to queries |
 
 The `search-layer` skill classifies query intent and picks the appropriate mode automatically. See `skills/search-layer/SKILL.md` for the full intent → mode mapping.

@@ -22,7 +22,7 @@ A public plugin marketplace for [Claude Code](https://docs.anthropic.com/en/docs
 /search-skills:setup
 ```
 
-The setup will guide you to add API keys to `~/.claude/settings.json`. **At least one** search source key (Brave / Exa / Tavily / Grok) is required.
+The setup will guide you to add API keys to `~/.claude/settings.json`. **At least one** standard search source key (Brave / Exa / Tavily / Grok) is required. Twitter is an optional opt-in source.
 
 3. Restart Claude Code for hooks and environment variables to take effect.
 
@@ -30,7 +30,7 @@ The setup will guide you to add API keys to `~/.claude/settings.json`. **At leas
 
 | Plugin | Description |
 |--------|-------------|
-| [search-skills](./plugins/search-skills/) | Multi-source search (Brave + Exa + Tavily + Grok) with intelligent content extraction (trafilatura + MinerU). Replaces built-in WebSearch/WebFetch via PreToolUse hooks. |
+| [search-skills](./plugins/search-skills/) | Multi-source search (Brave + Exa + Tavily + Grok + Twitter) with intelligent content extraction (trafilatura + MinerU). Replaces built-in WebSearch/WebFetch via PreToolUse hooks. |
 
 ## Credits
 

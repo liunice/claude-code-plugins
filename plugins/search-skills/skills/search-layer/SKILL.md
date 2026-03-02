@@ -1,16 +1,17 @@
 ---
 name: search-layer
 description: >
-  DEFAULT search tool for ALL search/lookup needs. Multi-source search (Brave+Exa+Tavily+Grok)
+  DEFAULT search tool for ALL search/lookup needs. Multi-source search (Brave+Exa+Tavily+Grok+Twitter)
   with intent-aware scoring and deduplication. Automatically classifies query intent and adjusts
   search strategy, scoring weights, and result synthesis. Use for ANY query that requires web
   search — factual lookups, research, news, comparisons, resource finding, status checks, etc.
+  Twitter is an opt-in source for X/Twitter content (requires --source twitter).
   Do NOT use WebSearch directly; always route through this skill.
 ---
 
 # Search Layer — Intent-Aware Multi-Source Search Protocol
 
-Four search sources: Brave + Exa + Tavily + Grok. Selects strategy, adjusts weights, and synthesizes by intent.
+Five search sources: Brave + Exa + Tavily + Grok + Twitter. Selects strategy, adjusts weights, and synthesizes by intent. Twitter is opt-in only.
 
 ## Execution Flow
 
@@ -21,7 +22,7 @@ User query
     |
 [Phase 2] Query decomposition & expansion -> generate sub-queries
     |
-[Phase 3] Multi-source parallel search -> search.py (Brave+Exa+Tavily+Grok)
+[Phase 3] Multi-source parallel search -> search.py (Brave+Exa+Tavily+Grok+Twitter)
     |
 [Phase 4] Merge & rank -> dedup + intent-weighted scoring
     |
@@ -43,6 +44,8 @@ After receiving a search request, **classify intent first**, then decide search 
 | **Exploratory** | "about X", "X ecosystem", "deep dive X" | deep | — | authority 0.5 |
 | **News** | "X news", "this week X" | deep | pd/pw | freshness 0.6 |
 | **Resource** | "X official site", "X GitHub", "X docs" | fast | — | keyword 0.5 |
+
+**Twitter/X query detection:** When the query specifically targets X/Twitter content (signal words: `x.com`, `twitter`, `tweet`, `trending on X`), use `twitter_search.py` directly — see "Phase 3.1: Twitter/X Operations" below. Do NOT route through `search.py`; the Phase 3.1 workflows are self-contained.
 
 > See `references/intent-guide.md` for detailed classification guide.
 
@@ -66,6 +69,21 @@ After receiving a search request, **classify intent first**, then decide search 
 | News | Add "news", "announcement", date | "AI news" -> + "AI news this week 2026" |
 | Resource | Add resource type | "Anthropic MCP" -> + "Anthropic MCP official documentation" |
 
+### Twitter query optimization
+
+When expanding queries for Twitter (via `twitter_search.py search` or `search.py --source twitter`), **combine variants with the `OR` operator** in a single query instead of making separate API calls. This reduces paid API usage.
+
+```
+# Bad: 2 API calls
+twitter_search.py search "GPT 5.4" --num 5
+twitter_search.py search "GPT-5.4" --num 5
+
+# Good: 1 API call with OR
+twitter_search.py search "\"GPT 5.4\" OR \"GPT-5.4\"" --num 5
+```
+
+Use OR for: spelling variants, synonyms, abbreviations (e.g. `"k8s" OR "Kubernetes"`), version number formats (e.g. `"5.4" OR "5-4"`).
+
 ---
 
 ## Phase 3: Multi-Source Parallel Search
@@ -83,11 +101,11 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
 
 **Source participation by mode:**
 
-| Mode | Brave | Exa | Tavily | Grok | Notes |
-|------|-------|-----|--------|------|-------|
-| fast | fallback | preferred | - | fallback | Single source: exa > brave > grok (Tavily reserved for answer mode) |
-| deep | yes | yes | yes | yes | All configured sources in parallel |
-| answer | - | - | yes | - | Tavily only (includes AI answer) |
+| Mode | Brave | Exa | Tavily | Grok | Twitter | Notes |
+|------|-------|-----|--------|------|---------|-------|
+| fast | fallback | preferred | - | fallback | - | Single source: exa > brave > grok (Tavily reserved for answer mode) |
+| deep | yes | yes | yes | yes | opt-in | All configured sources in parallel; Twitter only with `--source twitter` |
+| answer | - | - | yes | - | - | Tavily only (includes AI answer) |
 
 **Parameters:**
 
@@ -98,7 +116,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
 | `--intent` | Intent type for scoring weights |
 | `--freshness` | pd(24h) / pw(week) / pm(month) / py(year) |
 | `--domain-boost` | Comma-separated domains to boost (+0.2 authority) |
-| `--source` | Comma-separated source filter (brave,exa,tavily,grok) |
+| `--source` | Comma-separated source filter (brave,exa,tavily,grok,twitter). Only listed sources run. Opt-in sources like twitter require explicit inclusion |
+| `--twitter-max-queries` | Max Twitter API calls per invocation (default: 3, controls cost) |
 | `--num` | Results per source per query |
 
 **Grok source notes:**
@@ -106,6 +125,91 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
 - Default model: `grok-4.20-beta`
 - Auto-detects time-sensitive queries and injects current time context
 - If GROK_API_KEY is not set, Grok source is silently skipped
+
+**Twitter source in search.py (deep mode):**
+- **Opt-in only**: never runs unless explicitly requested via `--source twitter`
+- Delegates to `twitter_search.py` module internally
+- Paid API — use `--twitter-max-queries N` (default 3) to control cost per invocation
+
+---
+
+## Phase 3.1: Twitter/X Operations
+
+For queries targeting X/Twitter content, use `twitter_search.py` directly.
+
+**IMPORTANT — single-call principle:** Each scenario below maps to exactly **one** `twitter_search.py` call (except the two-phase "Get a specific account's tweets" which uses one `search.py` + one `twitter_search.py`). Rules:
+- After the call returns, synthesize and present results **immediately**. Do NOT retry with different keywords, broader date ranges, or alternative query variants.
+- Do NOT make additional `search.py`, Grok, or any other calls to "supplement" or "add context".
+- If results seem sparse, present what was returned — do not chase more data.
+- Only use other sources if the user **explicitly** asks for web results alongside Twitter results.
+
+**Scenario routing:**
+
+| Scenario | Example | Workflow |
+|----------|---------|----------|
+| **Get a specific account's tweets** | "OpenAI latest tweet", "what did Elon Musk post on X" | Two-phase: (1) find handle via regular web search (search.py), (2) call `user-tweets` |
+| **Search tweet content by keyword** | "AI trending on X", "tweets about GPT-5" | Single-phase: call `search` directly |
+| **Search with author + keyword** | "Elon Musk's tweets about AI" | Single-phase: call `search` with `--from` |
+
+### twitter_search.py subcommands
+
+```bash
+# Search tweets by keyword (with optional filters)
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
+  search "AI news" --since 2026-03-01 --num 5
+
+# Search a specific author's tweets about a topic
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
+  search "GPT-5" --from openai --since 2026-01-01
+
+# Get a user's latest tweets (by handle)
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
+  user-tweets --username openai --num 1
+```
+
+**`search` parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `query` (positional) | Search keywords |
+| `--from` | Filter by author handle (without @) |
+| `--since` | Start date (YYYY-MM-DD) |
+| `--until` | End date (YYYY-MM-DD) |
+| `--query-type` | Latest (default) / Top |
+| `--num` | Max results (default: 5, API max: 20) |
+
+**`user-tweets` parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--username` | Twitter handle, without @ (required) |
+| `--include-replies` | Include replies (default: exclude) |
+| `--num` | Max results (default: 5) |
+
+**Two-phase workflow example** ("get OpenAI's latest tweet"):
+
+```
+Phase 1 — Find the handle (use regular web sources, NOT Twitter API):
+  search.py "OpenAI official X Twitter account" --mode fast → extract handle from results
+
+Phase 2 — Get tweets (use Twitter API):
+  twitter_search.py user-tweets --username OpenAI --num 1
+```
+
+**`user-tweets` vs `search --from` — when to use which:**
+
+| Need | Use | Why |
+|------|-----|-----|
+| Latest tweets from a user (no filtering) | `user-tweets` | Timeline endpoint, chronological order |
+| A user's tweets about a specific topic | `search --from` | Supports keyword filtering |
+| A user's tweets within a date range | `search --from` | Supports `--since` / `--until` |
+| A user's tweets including replies | `user-tweets --include-replies` | Only `user-tweets` supports this |
+
+**Important notes:**
+- Uses [twitterapi.io](https://twitterapi.io) API (NOT the official X/Twitter API). Requires `TWITTER_API_KEY`.
+- Paid API — minimize calls. When the handle is already known or can be confidently inferred, skip Phase 1 and call `user-tweets` directly.
+- **Combine query variants with `OR`** to reduce API calls (see Phase 2 "Twitter query optimization").
+- Each call returns up to 20 results (one page, no pagination).
 
 ---
 
@@ -184,3 +288,6 @@ Search sources: Brave (5 results, 1.2s) | Exa (5 results, 2.1s) | Tavily (5 resu
 | Latest updates | `search.py "query" --mode deep --intent status --freshness pw` |
 | Comparison | `search.py --queries "A vs B" "A pros" "B pros" --intent comparison` |
 | Find resource | `search.py "query" --mode fast --intent resource` |
+| Twitter: keyword search | `twitter_search.py search "AI news" --since 2026-03-01 --num 5` |
+| Twitter: author + topic | `twitter_search.py search "GPT-5" --from openai` |
+| Twitter: user's latest | `twitter_search.py user-tweets --username openai --num 1` |

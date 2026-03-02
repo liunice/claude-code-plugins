@@ -63,13 +63,14 @@ keys = {
     'EXA_API_KEY': os.environ.get('EXA_API_KEY', ''),
     'TAVILY_API_KEY': os.environ.get('TAVILY_API_KEY', ''),
     'GROK_API_KEY': os.environ.get('GROK_API_KEY', ''),
+    'TWITTER_API_KEY': os.environ.get('TWITTER_API_KEY', ''),
     'MINERU_TOKEN': os.environ.get('MINERU_TOKEN', ''),
 }
 configured = [k for k, v in keys.items() if v]
 missing = [k for k, v in keys.items() if not v]
 print('CONFIGURED: ' + (','.join(configured) if configured else 'none'))
 print('MISSING: ' + (','.join(missing) if missing else 'none'))
-search_keys = [k for k in ['BRAVE_API_KEY', 'EXA_API_KEY', 'TAVILY_API_KEY', 'GROK_API_KEY'] if os.environ.get(k)]
+search_keys = [k for k in ['BRAVE_API_KEY', 'EXA_API_KEY', 'TAVILY_API_KEY', 'GROK_API_KEY', 'TWITTER_API_KEY'] if os.environ.get(k)]
 print('SEARCH_READY: ' + ('yes' if search_keys else 'no'))
 "
 ```
@@ -92,22 +93,24 @@ Add your key(s) to ~/.claude/settings.json under the "env" field:
     "BRAVE_API_KEY": "your-key",
     "EXA_API_KEY": "your-key",
     "TAVILY_API_KEY": "your-key",
-    "GROK_API_KEY": "your-key"
+    "GROK_API_KEY": "your-key",
+    "TWITTER_API_KEY": "your-key"
   }
 }
 
 Where to get keys:
-- Brave:  https://brave.com/search/api/  (free tier available, card required)
-- Exa:    https://exa.ai
-- Tavily: https://tavily.com
-- Grok:   https://docs.x.ai/docs/overview  (OpenAI-compatible API)
+- Brave:   https://brave.com/search/api/  (free tier available, card required)
+- Exa:     https://exa.ai
+- Tavily:  https://tavily.com
+- Grok:    https://docs.x.ai/docs/overview  (OpenAI-compatible API)
+- Twitter: https://twitterapi.io  (NOT the official X/Twitter API; opt-in source, paid)
 
 Optional settings (only add if needed):
 - GROK_API_URL:    Custom endpoint (default: https://api.x.ai/v1)
 - GROK_MODEL:      Custom model (default: grok-4.20-beta)
 - GROK_TIMEOUT:    Grok request timeout in seconds (default: 120)
 - SEARCH_TIMEOUT:  Brave/Exa/Tavily request timeout in seconds (default: 30)
-- MINERU_TOKEN:    https://mineru.net/apiManage (for anti-crawl / PDF extraction)
+- MINERU_TOKEN:    https://mineru.net/apiManage/token (for anti-crawl / PDF extraction)
 
 After editing settings.json, restart Claude Code for changes to take effect.
 ```
