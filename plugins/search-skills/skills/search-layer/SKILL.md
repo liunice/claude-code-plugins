@@ -150,6 +150,13 @@ For queries targeting X/Twitter content, use `twitter_search.py` directly.
 | **Get a specific account's tweets** | "OpenAI latest tweet", "what did Elon Musk post on X" | Two-phase: (1) find handle via regular web search (search.py), (2) call `user-tweets` |
 | **Search tweet content by keyword** | "AI trending on X", "tweets about GPT-5" | Single-phase: call `search` directly |
 | **Search with author + keyword** | "Elon Musk's tweets about AI" | Single-phase: call `search` with `--from` |
+| **Get trending topics** | "Twitter trends", "trending on X", "what's hot on X" | Single-phase: call `trends` directly |
+| **Get top tweets in a region** | "top tweets in US", "most popular tweets in Japan" | Two-phase: (1) `trends` with woeid to get topic names, (2) `search` with those topics |
+
+**Routing hints — `trends` vs `search`:**
+- **`trends` returns topic names, NOT actual tweets.** Use it to discover what's trending, then follow up with `search` if the user wants actual tweet content.
+- When the user asks for "popular/hot/trending" **tweets** in a location without a specific keyword, use the two-phase workflow: (1) call `trends --woeid {id}` to get trending topic names, (2) combine the top topic names with `OR` into a single `search` call with `--query-type Top`.
+- When the user asks for tweets **about a specific topic** (e.g. "popular tweets about AI"), use `search` with `--query-type Top` directly — no need for `trends`.
 
 ### twitter_search.py subcommands
 
@@ -165,6 +172,14 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
 # Get a user's latest tweets (by handle)
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
   user-tweets --username openai --num 1
+
+# Get trending topics (worldwide by default)
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
+  trends --num 5
+
+# Get trending topics for a specific location (US)
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/twitter_search.py \
+  trends --woeid 23424977 --num 10
 ```
 
 **`search` parameters:**
@@ -195,6 +210,46 @@ Phase 1 — Find the handle (use regular web sources, NOT Twitter API):
 Phase 2 — Get tweets (use Twitter API):
   twitter_search.py user-tweets --username OpenAI --num 1
 ```
+
+**Two-phase workflow example** ("top 5 tweets in China"):
+
+```
+Phase 1 — Get trending topics (use Twitter API):
+  twitter_search.py trends --woeid 23424748 --num 5
+  → extracts topic names, e.g. ["TopicA", "TopicB", "TopicC", ...]
+
+Phase 2 — Search top tweets for those topics (use Twitter API):
+  twitter_search.py search "TopicA OR TopicB OR TopicC" --query-type Top --since 2026-03-02 --num 5
+```
+
+**`trends` parameters:**
+
+| Parameter | Description |
+|-----------|-------------|
+| `--woeid` | Where On Earth ID (default: 1 = Worldwide) |
+| `--num` | Max trends to return (default: 5) |
+
+**Common woeid values**:
+
+| woeid | Location |
+|-------|----------|
+| 1 | Worldwide |
+| 23424977 | United States |
+| 23424975 | United Kingdom |
+| 23424856 | Japan |
+| 23424748 | China |
+| 23424868 | South Korea |
+| 23424829 | Germany |
+| 23424819 | France |
+| 23424848 | India |
+| 23424775 | Canada |
+| 23424900 | Mexico |
+| 23424768 | Brazil |
+| 23424803 | Ireland |
+| 23424750 | Australia |
+| 23424873 | Singapore |
+
+Full woeid list: https://gist.github.com/tedyblood/5bb5a9f78314cc1f478b3dd7cde790b9
 
 **`user-tweets` vs `search --from` — when to use which:**
 
@@ -300,3 +355,4 @@ When results include Twitter data, the `title` field contains engagement metrics
 | Twitter: keyword search | `twitter_search.py search "AI news" --since 2026-03-01 --num 5` |
 | Twitter: author + topic | `twitter_search.py search "GPT-5" --from openai` |
 | Twitter: user's latest | `twitter_search.py user-tweets --username openai --num 1` |
+| Twitter: trending topics | `twitter_search.py trends --woeid 1 --num 5` |

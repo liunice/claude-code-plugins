@@ -3,9 +3,10 @@
 Twitter/X search via twitterapi.io (NOT the official X/Twitter API).
 
 Standalone CLI and importable module for Twitter-specific operations.
-Two subcommands:
+Three subcommands:
   search       - Advanced tweet search by keyword, with optional author/date filters
   user-tweets  - Get latest tweets from a specific user by handle
+  trends       - Get trending topics by location (woeid)
 
 API docs: https://docs.twitterapi.io/
 
@@ -22,14 +23,20 @@ Usage:
 
   # Get a user's latest tweets
   python3 twitter_search.py user-tweets --username openai --num 1
+
+  # Get trending topics (worldwide by default)
+  python3 twitter_search.py trends --num 5
+
+  # Get trending topics for a specific location
+  python3 twitter_search.py trends --woeid 23424977 --num 10
 """
 
 import json
 import sys
 import os
 import argparse
-from datetime import datetime, timezone
-import threading
+from datetime import datetime
+from urllib.parse import quote_plus
 
 try:
     import requests
@@ -220,6 +227,53 @@ def user_tweets(username: str, api_key: str, *,
         return []
 
 
+def get_trends(api_key: str, *,
+               woeid: int = 1,
+               num: int = 5,
+               timeout: int = 30,
+               query_counter: dict = None) -> list:
+    """Get trending topics for a location.
+
+    Args:
+        api_key: twitterapi.io API key.
+        woeid: Where On Earth ID (default: 1 = Worldwide).
+        num: Max trends to return.
+        timeout: HTTP request timeout in seconds.
+        query_counter: Thread-safe rate limiter dict from search.py.
+
+    Returns:
+        list of normalized trend result dicts.
+    """
+    if not _check_quota(query_counter):
+        return []
+
+    try:
+        data = _api_get("/twitter/trends", api_key, {
+            "woeid": woeid,
+        }, timeout=timeout)
+
+        results = []
+        for item in data.get("trends", [])[:num]:
+            # API wraps each trend in a "trend" key
+            trend = item.get("trend", item)
+            name = trend.get("name", "")
+            rank = trend.get("rank", "")
+            query = trend.get("target", {}).get("query", name)
+            search_url = f"https://x.com/search?q={quote_plus(query)}"
+            prefix = f"#{rank} " if rank else ""
+            results.append({
+                "title": f"{prefix}{name}",
+                "url": search_url,
+                "snippet": trend.get("meta_description", ""),
+                "published_date": "",
+                "source": "twitter",
+            })
+        return results
+    except Exception as e:
+        print(f"[twitter:trends] error: {e}", file=sys.stderr)
+        return []
+
+
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
@@ -251,6 +305,13 @@ def main():
                          help="Include replies (default: exclude)")
     sp_user.add_argument("--num", type=int, default=5,
                          help=f"Max results (default: 5, API max: {_API_MAX_PER_PAGE} per page)")
+
+    # --- trends ---
+    sp_trends = sub.add_parser("trends", help="Get trending topics by location")
+    sp_trends.add_argument("--woeid", type=int, default=1,
+                           help="Where On Earth ID (default: 1 = Worldwide)")
+    sp_trends.add_argument("--num", type=int, default=5,
+                           help="Max trends to return (default: 5)")
 
     args = ap.parse_args()
 
@@ -294,6 +355,19 @@ def main():
         output = {
             "action": "user-tweets",
             "username": args.username,
+            "count": len(results),
+            "results": results,
+        }
+
+    elif args.action == "trends":
+        results = get_trends(
+            api_key,
+            woeid=args.woeid,
+            num=args.num,
+        )
+        output = {
+            "action": "trends",
+            "woeid": args.woeid,
             "count": len(results),
             "results": results,
         }
