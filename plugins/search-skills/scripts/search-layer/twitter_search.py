@@ -76,6 +76,15 @@ def _api_get(endpoint: str, api_key: str, params: dict, timeout: int = 30) -> di
     return r.json()
 
 
+def _format_count(n: int) -> str:
+    """Format a number with K/M suffixes for compact display."""
+    if n >= 1_000_000:
+        return f"{n / 1_000_000:.1f}M"
+    if n >= 1_000:
+        return f"{n / 1_000:.1f}K"
+    return str(n)
+
+
 def _parse_tweet(tweet: dict) -> dict:
     """Normalize a tweet object into the standard result format."""
     author = tweet.get("author", {})
@@ -97,8 +106,14 @@ def _parse_tweet(tweet: dict) -> dict:
         except (ValueError, TypeError):
             published_date = created_at
 
+    # Engagement metrics (viewCount, likeCount, retweetCount)
+    views = tweet.get("viewCount", 0) or 0
+    likes = tweet.get("likeCount", 0) or 0
+    retweets = tweet.get("retweetCount", 0) or 0
+    engagement = f"\U0001F440 {_format_count(views)} \uFF5C\U0001F44D {_format_count(likes)} \uFF5C\U0001F501 {_format_count(retweets)}"
+
     return {
-        "title": f"@{username} ({display_name})",
+        "title": f"@{username} ({display_name}) {engagement}",
         "url": url,
         "snippet": tweet.get("text", ""),
         "published_date": published_date,

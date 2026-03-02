@@ -262,6 +262,15 @@ Example format:
 Search sources: Brave (5 results, 1.2s) | Exa (5 results, 2.1s) | Tavily (5 results, 0.9s) | Grok (error: timeout, 60.0s)
 ```
 
+### Twitter engagement metrics
+
+When results include Twitter data, the `title` field contains engagement metrics: `👀 views ｜👍 likes ｜🔁 retweets`. **Always display these metrics** alongside each tweet in the output, e.g.:
+
+```
+- @username: "tweet content..." (👀 36.2K ｜👍 576 ｜🔁 66)
+  https://x.com/username/status/123
+```
+
 ### Content synthesis
 
 - **Answer first, then sources** (don't start with "I searched...")
