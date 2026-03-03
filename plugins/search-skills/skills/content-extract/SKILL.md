@@ -2,10 +2,11 @@
 name: content-extract
 description: >
   Intelligent URL content extraction. Converts any URL to clean text/markdown using
-  a multi-layer approach: trafilatura fast probe -> heuristics check -> MinerU API fallback.
+  a multi-layer approach: trafilatura fast probe -> heuristics check -> MinerU API fallback
+  -> Tavily Extract fallback -> Exa Contents fallback.
   Use when you need to read the full content of a web page. Handles anti-crawl sites
-  (WeChat, Zhihu, Xiaohongshu) and binary files (PDF, Office docs) automatically.
-  Do NOT use WebFetch directly; always route through this skill.
+  (WeChat, Zhihu, Xiaohongshu, Cloudflare-protected) and binary files (PDF, Office docs)
+  automatically. Do NOT use WebFetch directly; always route through this skill.
 ---
 
 # Content Extract — Intelligent URL -> Text/Markdown
@@ -28,8 +29,12 @@ URL input
     Return content
     |fail
 [5] MINERU_TOKEN configured? --yes--> MinerU fallback
-    |no
-    Return error with probe failure reason
+    |fail or no
+[6] TAVILY_API_KEY configured? --yes--> Tavily Extract (cloud rendering)
+    |fail or no
+[7] EXA_API_KEY configured? --yes--> Exa Contents (cache + live crawl)
+    |fail or no
+    Return error with all failure reasons
 ```
 
 ## Usage
@@ -70,7 +75,7 @@ On failure:
 {
   "ok": false,
   "url": "https://...",
-  "error": "Probe: Anti-crawl page detected; MinerU: MINERU_TOKEN not configured"
+  "error": "Probe: Anti-crawl page detected; MinerU: ...; Tavily: ...; Exa: ..."
 }
 ```
 
@@ -100,6 +105,8 @@ Probe extraction is considered failed if:
 | 2 | BeautifulSoup | Fallback when trafilatura extracts < 200 chars |
 | 3 | Regex strip | Last resort when BS4 is unavailable |
 | 4 | MinerU API | Anti-crawl/binary fallback (requires MINERU_TOKEN) |
+| 5 | Tavily Extract | Cloud rendering fallback for JS/anti-crawl pages (requires TAVILY_API_KEY) |
+| 6 | Exa Contents | Cache-first with live crawl fallback (requires EXA_API_KEY) |
 
 ## Dependencies
 
@@ -107,3 +114,5 @@ Probe extraction is considered failed if:
 - `trafilatura` — Primary content extractor
 - `beautifulsoup4` + `lxml` — Fallback extractor
 - `MINERU_TOKEN` env var — Optional, for MinerU fallback
+- `TAVILY_API_KEY` env var — Optional, for Tavily Extract fallback
+- `EXA_API_KEY` env var — Optional, for Exa Contents fallback

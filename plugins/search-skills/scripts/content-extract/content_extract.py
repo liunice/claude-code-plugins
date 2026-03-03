@@ -7,9 +7,9 @@ Decision tree:
   2. probe_url(): use requests + trafilatura.extract() to get body text
   3. Apply heuristics (anti-crawl keyword detection, minimum length 800 chars)
   4. If probe fails + MINERU_TOKEN is set -> fallback to MinerU
-  5. Return unified JSON result contract
-
-This is a complete replacement for WebFetch / Tavily extract.
+  5. If MinerU fails + TAVILY_API_KEY is set -> fallback to Tavily Extract
+  6. If Tavily fails + EXA_API_KEY is set -> fallback to Exa Contents
+  7. Return unified JSON result contract
 
 Usage:
   python3 content_extract.py --url "https://example.com"
@@ -271,6 +271,91 @@ def _mineru_extract(url: str, model: str | None = None, max_chars: int = 20000) 
 
 
 # ---------------------------------------------------------------------------
+# Tavily Extract fallback (cloud-based, handles JS-rendered / anti-crawl pages)
+# ---------------------------------------------------------------------------
+def _tavily_extract(url: str) -> dict:
+    """Call Tavily Extract API to get page content as markdown.
+
+    Tavily renders pages server-side, bypassing Cloudflare and similar
+    anti-crawl protections that block plain HTTP requests.
+
+    Returns {"ok": True, "content": ..., ...} or {"ok": False, "reason": ...}
+    """
+    api_key = os.environ.get("TAVILY_API_KEY")
+    if not api_key:
+        return {"ok": False, "reason": "TAVILY_API_KEY not configured"}
+
+    try:
+        resp = requests.post(
+            "https://api.tavily.com/extract",
+            headers={"Content-Type": "application/json"},
+            json={"api_key": api_key, "urls": [url]},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = data.get("results", [])
+        if results and results[0].get("raw_content", "").strip():
+            content = results[0]["raw_content"].strip()
+            return {
+                "ok": True,
+                "title": results[0].get("title", ""),
+                "content": content,
+                "content_length": len(content),
+                "method": "tavily",
+            }
+        return {"ok": False, "reason": "Tavily returned empty content"}
+    except Exception as e:
+        return {"ok": False, "reason": f"Tavily extraction failed: {e}"}
+
+
+# ---------------------------------------------------------------------------
+# Exa Contents fallback (cache-first with live crawl, handles anti-crawl pages)
+# ---------------------------------------------------------------------------
+def _exa_extract(url: str) -> dict:
+    """Call Exa Contents API to get page content.
+
+    Exa returns instant results from its cache, with automatic live crawling
+    as fallback for uncached pages.
+
+    Returns {"ok": True, "content": ..., ...} or {"ok": False, "reason": ...}
+    """
+    api_key = os.environ.get("EXA_API_KEY")
+    if not api_key:
+        return {"ok": False, "reason": "EXA_API_KEY not configured"}
+
+    try:
+        resp = requests.post(
+            "https://api.exa.ai/contents",
+            headers={"x-api-key": api_key, "Content-Type": "application/json"},
+            json={"urls": [url], "text": True},
+            timeout=60,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        results = data.get("results", [])
+        if results and results[0].get("text", "").strip():
+            content = results[0]["text"].strip()
+            return {
+                "ok": True,
+                "title": results[0].get("title", ""),
+                "content": content,
+                "content_length": len(content),
+                "method": "exa",
+            }
+        return {"ok": False, "reason": "Exa returned empty content"}
+    except Exception as e:
+        return {"ok": False, "reason": f"Exa extraction failed: {e}"}
+
+
+def _apply_max_chars(result: dict, max_chars: int) -> None:
+    """Truncate content in result dict if it exceeds max_chars."""
+    if max_chars and result.get("content") and len(result["content"]) > max_chars:
+        result["content"] = result["content"][:max_chars] + "\n\n[TRUNCATED]"
+        result["content_length"] = len(result["content"])
+
+
+# ---------------------------------------------------------------------------
 # Main extraction logic
 # ---------------------------------------------------------------------------
 def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -> dict:
@@ -283,7 +368,7 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         "title": str,
         "content": str,
         "content_length": int,
-        "method": "trafilatura|bs4|regex|mineru",
+        "method": "trafilatura|bs4|regex|mineru|tavily|exa",
         "fallback_used": bool,
         "error": str (only if ok=False)
       }
@@ -337,10 +422,32 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         result["fallback_used"] = True
         return result
 
-    # Step 5: Everything failed
+    # Step 5: Tavily Extract fallback (cloud-based rendering)
+    print(f"[content-extract] MinerU failed: {mineru_result.get('reason', '')}, trying Tavily Extract", file=sys.stderr)
+    tavily_result = _tavily_extract(url)
+    if tavily_result["ok"]:
+        result.update(tavily_result)
+        result["url"] = url
+        result["fallback_used"] = True
+        _apply_max_chars(result, max_chars)
+        return result
+
+    # Step 6: Exa Contents fallback (cache-first with live crawl)
+    print(f"[content-extract] Tavily failed: {tavily_result.get('reason', '')}, trying Exa Contents", file=sys.stderr)
+    exa_result = _exa_extract(url)
+    if exa_result["ok"]:
+        result.update(exa_result)
+        result["url"] = url
+        result["fallback_used"] = True
+        _apply_max_chars(result, max_chars)
+        return result
+
+    # Step 7: Everything failed
     result["error"] = (
         f"Probe: {probe_result.get('reason', 'unknown')}; "
-        f"MinerU: {mineru_result.get('reason', 'not attempted')}"
+        f"MinerU: {mineru_result.get('reason', 'not attempted')}; "
+        f"Tavily: {tavily_result.get('reason', 'not attempted')}; "
+        f"Exa: {exa_result.get('reason', 'not attempted')}"
     )
     return result
 

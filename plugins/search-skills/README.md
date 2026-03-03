@@ -8,7 +8,7 @@ Based on [openclaw-search-skills](https://github.com/blessonism/openclaw-search-
 
 - **5-source parallel search**: Brave + Exa + Tavily + Grok + Twitter (Twitter is opt-in)
 - **Intent-aware scoring**: 7 intent types with adaptive weights
-- **Smart content extraction**: trafilatura probe with MinerU fallback
+- **Smart content extraction**: trafilatura probe with MinerU / Tavily Extract / Exa Contents fallback
 - **Thread pulling**: Recursive reference tracking for GitHub issues, HN, Reddit, V2EX
 - **Hook-based interception**: Transparently replaces `WebSearch` / `WebFetch`
 
@@ -77,7 +77,7 @@ Run `/search-skills:setup` for guided configuration, or see `.env.example` for t
 | `scripts/search-layer/fetch_thread.py` | Deep thread fetcher (GitHub, HN, Reddit, V2EX, web) |
 | `scripts/search-layer/chain_tracker.py` | Recursive reference chain tracker |
 | `scripts/search-layer/relevance_gate.py` | LLM-based relevance scoring for chain tracking |
-| `scripts/content-extract/content_extract.py` | URL → Markdown with trafilatura + MinerU fallback |
+| `scripts/content-extract/content_extract.py` | URL → Markdown with trafilatura + MinerU/Tavily/Exa fallback |
 | `scripts/mineru-extract/mineru_extract.py` | MinerU API single-URL extractor |
 | `scripts/mineru-extract/mineru_parse_documents.py` | MinerU API batch extractor |
 
@@ -100,7 +100,7 @@ The `search-layer` skill classifies query intent and picks the appropriate mode 
 | Skill | Description |
 |-------|-------------|
 | `search-layer` | Full search protocol: intent classification → query expansion → multi-source retrieval → scoring → synthesis |
-| `content-extract` | URL content extraction decision tree: whitelist → probe → MinerU fallback |
+| `content-extract` | URL content extraction decision tree: whitelist → probe → MinerU / Tavily / Exa fallback |
 | `mineru-extract` | MinerU API usage: model selection, parameters, output handling |
 
 ## Upstream
