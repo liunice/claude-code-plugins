@@ -25,7 +25,7 @@ def main():
     reason = f"Please use the Skill tool to invoke 'search-skills:search-layer' with args: '{query}'"
 
     print(json.dumps({
-        "systemMessage": "WebSearch intercepted. Use the search-skills plugin instead.",
+        "systemMessage": "MANDATORY: WebSearch is disabled. You MUST immediately call the Skill tool as specified in the deny reason. Do NOT skip the search or answer from memory.",
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",

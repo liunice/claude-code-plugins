@@ -24,7 +24,7 @@ def main():
     reason = f"Please use the Skill tool to invoke 'search-skills:content-extract' with args: '{url}'"
 
     print(json.dumps({
-        "systemMessage": "WebFetch intercepted. Use the search-skills plugin instead.",
+        "systemMessage": "MANDATORY: WebFetch is disabled. You MUST immediately call the Skill tool as specified in the deny reason. Do NOT skip the extraction or use other methods.",
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "deny",
