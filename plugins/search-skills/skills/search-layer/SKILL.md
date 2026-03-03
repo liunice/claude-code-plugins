@@ -90,7 +90,7 @@ Use OR for: spelling variants, synonyms, abbreviations (e.g. `"k8s" OR "Kubernet
 
 ## Phase 3: Multi-Source Parallel Search
 
-Run search.py with appropriate parameters:
+Run search.py with appropriate parameters. **Always set Bash timeout to 600000ms (10 min)** — search.py manages per-source timeouts internally; the Bash timeout is only a safety net to avoid premature termination.
 
 ```bash
 python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
@@ -127,6 +127,15 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/search.py \
 - Default model: `grok-4.20-beta`
 - Auto-detects time-sensitive queries and injects current time context
 - If GROK_API_KEY is not set, Grok source is silently skipped
+
+**Timeout environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SEARCH_TIMEOUT` | 30 (seconds) | Per-request timeout for Brave, Exa, Tavily, Twitter |
+| `GROK_TIMEOUT` | 120 (seconds) | Per-request timeout for Grok (LLM calls are slower) |
+
+Both values must stay under 600s — the Bash tool has a hard ceiling of 10 minutes, and the slowest source determines total runtime.
 
 **Twitter source in search.py (deep mode):**
 - **Opt-in only**: never runs unless explicitly requested via `--source twitter`
@@ -252,6 +261,9 @@ Phase 2 — Search top tweets for those topics (use Twitter API):
 - **Combine query variants with `OR`** to reduce API calls (see Phase 2 "Twitter query optimization").
 - Each call returns up to 20 results (one page, no pagination).
 
+**Fallback when `TWITTER_API_KEY` is not configured:**
+When `twitter_search.py` fails (missing API key, API error, etc.), fall back to `search.py --mode deep` with `--domain-boost x.com` to prioritize X/Twitter content in ranking. Do NOT add `site:x.com` to the query. Follow the same single-call principle — present whatever results are returned without additional retry.
+
 ---
 
 ### Phase 3.2: Reference Tracking (Thread Pulling)
@@ -299,7 +311,7 @@ Example format:
 Search sources: Brave (5 results, 1.2s) | Exa (5 results, 2.1s) | Tavily (5 results, 0.9s) | Grok (error: timeout, 60.0s)
 ```
 
-### Twitter engagement metrics
+### Twitter API result display
 
 When results include Twitter data, the `title` field contains engagement metrics: `👀 views ｜👍 likes ｜🔁 retweets`. **Always display these metrics** alongside each tweet in the output, e.g.:
 
@@ -307,6 +319,8 @@ When results include Twitter data, the `title` field contains engagement metrics
 - @username: "tweet content..." (👀 36.2K ｜👍 576 ｜🔁 66)
   https://x.com/username/status/123
 ```
+
+Twitter results have `published_date` in UTC (e.g. `2026-02-27T13:31:31Z`). Convert to the user's local timezone when displaying.
 
 ### Content synthesis
 
