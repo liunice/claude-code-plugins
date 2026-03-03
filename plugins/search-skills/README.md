@@ -81,7 +81,7 @@ Run `/search-skills:setup` for guided configuration, or see `.env.example` for t
 | `scripts/mineru-extract/mineru_extract.py` | MinerU API single-URL extractor |
 | `scripts/mineru-extract/mineru_parse_documents.py` | MinerU API batch extractor |
 
-> **Note:** `chain_tracker.py` depends on `relevance_gate.py`, which uses Grok as the LLM to score link relevance. `GROK_API_KEY` is required for recursive reference tracking to work properly. Without it, the relevance gate falls back to returning all candidates unscored. `fetch_thread.py` works independently and does not require Grok.
+> **Note:** `chain_tracker.py` is a standalone script for recursive reference tracking (not part of the normal search flow). It uses Grok (via `relevance_gate.py`) to score link relevance, so `GROK_API_KEY` is required. Without it, all candidates are returned unscored. `fetch_thread.py` and `--extract-refs` work independently and do not require Grok.
 
 ## Search Modes
 

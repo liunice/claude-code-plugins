@@ -268,7 +268,7 @@ When `twitter_search.py` fails (missing API key, API error, etc.), fall back to 
 
 ### Phase 3.2: Reference Tracking (Thread Pulling)
 
-When results contain GitHub issue/PR links and intent is Status or Exploratory, auto-trigger reference tracking.
+**When to use:** After Phase 2 search completes, if the results contain discussion thread URLs (GitHub issues/PRs, HN, Reddit, V2EX) **and** the intent is Status or Exploratory, add `--extract-refs` to fetch and extract references from each result. This is not automatic — you must decide to add the flag based on the search results.
 
 #### search.py --extract-refs (batch)
 
@@ -283,6 +283,8 @@ python3 ${CLAUDE_PLUGIN_ROOT}/scripts/search-layer/fetch_thread.py "https://gith
 ```
 
 Supports: GitHub issues/PRs, HN, Reddit, V2EX, generic web pages.
+
+> Note: `--extract-refs` uses `fetch_thread.py` internally and does not require Grok. For deeper recursive reference chain tracking, use `chain_tracker.py` directly (requires `GROK_API_KEY`).
 
 ---
 
