@@ -534,8 +534,9 @@ def search_grok(query: str, api_url: str, api_key: str, model: str = "grok-4.20-
 def search_exa(query: str, key: str, num: int = 5, timeout: int = 30) -> list:
     """Search via Exa semantic search API."""
     try:
+        api_base = os.environ.get("EXA_API_URL", "https://api.exa.ai")
         r = requests.post(
-            "https://api.exa.ai/search",
+            f"{api_base.rstrip('/')}/search",
             headers={"x-api-key": key, "Content-Type": "application/json"},
             json={"query": query, "numResults": num, "type": "auto"},
             timeout=timeout,
@@ -578,8 +579,9 @@ def search_tavily(query: str, key: str, num: int = 5,
             days_map = {"pd": 1, "pw": 7, "pm": 30, "py": 365}
             if freshness in days_map:
                 payload["days"] = days_map[freshness]
+        api_base = os.environ.get("TAVILY_API_URL", "https://api.tavily.com")
         r = requests.post(
-            "https://api.tavily.com/search",
+            f"{api_base.rstrip('/')}/search",
             headers={"Content-Type": "application/json"},
             json={"api_key": key, **payload},
             timeout=timeout,

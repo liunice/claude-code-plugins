@@ -86,11 +86,13 @@ See [`references/domain-whitelist.md`](../../references/domain-whitelist.md) for
 
 All API keys are optional. The script uses whichever services are configured and skips the rest.
 
-| Variable | Used By |
-|----------|---------|
-| `TAVILY_API_KEY` | Tavily Extract API |
-| `EXA_API_KEY` | Exa Contents API |
-| `MINERU_TOKEN` | MinerU parsing API |
+| Variable | Used By | Default |
+|----------|---------|---------|
+| `TAVILY_API_KEY` | Tavily Extract API | — |
+| `TAVILY_API_URL` | Custom Tavily base URL | `https://api.tavily.com` |
+| `EXA_API_KEY` | Exa Contents API | — |
+| `EXA_API_URL` | Custom Exa base URL | `https://api.exa.ai` |
+| `MINERU_TOKEN` | MinerU parsing API | — |
 
 ## Dependencies
 

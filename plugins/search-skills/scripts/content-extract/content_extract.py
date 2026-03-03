@@ -295,8 +295,9 @@ def _tavily_extract(url: str) -> dict:
         return {"ok": False, "reason": "TAVILY_API_KEY not configured"}
 
     try:
+        api_base = os.environ.get("TAVILY_API_URL", "https://api.tavily.com")
         resp = requests.post(
-            "https://api.tavily.com/extract",
+            f"{api_base.rstrip('/')}/extract",
             headers={"Content-Type": "application/json"},
             json={"api_key": api_key, "urls": [url]},
             timeout=60,
@@ -338,8 +339,9 @@ def _exa_extract(url: str) -> dict:
         return {"ok": False, "reason": "EXA_API_KEY not configured"}
 
     try:
+        api_base = os.environ.get("EXA_API_URL", "https://api.exa.ai")
         resp = requests.post(
-            "https://api.exa.ai/contents",
+            f"{api_base.rstrip('/')}/contents",
             headers={"x-api-key": api_key, "Content-Type": "application/json"},
             json={"urls": [url], "text": True},
             timeout=60,

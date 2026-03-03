@@ -106,8 +106,10 @@ Where to get keys:
 - Twitter: https://twitterapi.io  (NOT the official X/Twitter API; opt-in source, paid)
 
 Optional settings (only add if needed):
-- GROK_API_URL:    Custom endpoint (default: https://api.x.ai/v1)
-- GROK_MODEL:      Custom model (default: grok-4.20-beta)
+- EXA_API_URL:     Custom Exa API base URL (default: https://api.exa.ai)
+- TAVILY_API_URL:  Custom Tavily API base URL (default: https://api.tavily.com)
+- GROK_API_URL:    Custom Grok endpoint (default: https://api.x.ai/v1)
+- GROK_MODEL:      Custom Grok model (default: grok-4.20-beta)
 - GROK_TIMEOUT:    Grok request timeout in seconds (default: 120)
 - SEARCH_TIMEOUT:  Brave/Exa/Tavily request timeout in seconds (default: 30)
 - MINERU_TOKEN:    https://mineru.net/apiManage/token (for anti-crawl / PDF extraction)
