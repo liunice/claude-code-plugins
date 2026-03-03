@@ -2,14 +2,15 @@
 """
 Intelligent content extraction: URL -> clean Markdown/text.
 
-Decision tree:
-  1. Check domain whitelist -> if match, go directly to MinerU
-  2. probe_url(): use requests + trafilatura.extract() to get body text
-  3. Apply heuristics (anti-crawl keyword detection, minimum length 800 chars)
-  4. If probe fails + MINERU_TOKEN is set -> fallback to MinerU
-  5. If MinerU fails + TAVILY_API_KEY is set -> fallback to Tavily Extract
-  6. If Tavily fails + EXA_API_KEY is set -> fallback to Exa Contents
-  7. Return unified JSON result contract
+Extraction paths (optimized by URL type):
+  Binary files:    MinerU -> Tavily -> Exa
+  Whitelisted:     MinerU -> Probe -> Tavily -> Exa
+  Normal URLs:     Probe -> Tavily -> Exa -> MinerU
+
+  - Probe: requests + trafilatura/bs4/regex (free, fastest)
+  - Tavily Extract: cloud rendering for anti-crawl/JS pages
+  - Exa Contents: cache-first with live crawl fallback
+  - MinerU: best for binary files (preserves tables/formulas/OCR)
 
 Usage:
   python3 content_extract.py --url "https://example.com"
@@ -368,7 +369,7 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         "title": str,
         "content": str,
         "content_length": int,
-        "method": "trafilatura|bs4|regex|mineru|tavily|exa",
+        "method": "trafilatura|bs4|regex|tavily|exa|mineru",
         "fallback_used": bool,
         "error": str (only if ok=False)
       }
@@ -383,47 +384,40 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         "fallback_used": False,
     }
 
-    # Step 1: Binary files go directly to MinerU
+    probe_result = None
+    mineru_result = None
+
+    # Step 1: Binary files -> MinerU directly (best for preserving structure/tables/OCR)
     if _is_binary_url(url):
         mineru_result = _mineru_extract(url, model=mineru_model, max_chars=max_chars)
         if mineru_result["ok"]:
             result.update(mineru_result)
             result["url"] = url
             result["fallback_used"] = True
-        else:
-            result["error"] = mineru_result.get("reason", "Binary file extraction failed")
-        return result
-
-    # Step 2: Domain whitelist check -> MinerU directly
-    if _is_whitelisted(url):
-        mineru_result = _mineru_extract(url, model=mineru_model or "MinerU-HTML", max_chars=max_chars)
-        if mineru_result["ok"]:
-            result.update(mineru_result)
-            result["url"] = url
-            result["fallback_used"] = True
             return result
-        # If MinerU fails, still try probe as fallback
-        print(f"[content-extract] MinerU failed for whitelisted domain, trying probe: {mineru_result.get('reason', '')}", file=sys.stderr)
+        # MinerU failed, fall through to cloud fallbacks
+        print(f"[content-extract] MinerU failed for binary: {mineru_result.get('reason', '')}", file=sys.stderr)
+    else:
+        # Step 2: Domain whitelist check -> MinerU directly (optimized for these sites)
+        if _is_whitelisted(url):
+            mineru_result = _mineru_extract(url, model=mineru_model or "MinerU-HTML", max_chars=max_chars)
+            if mineru_result["ok"]:
+                result.update(mineru_result)
+                result["url"] = url
+                result["fallback_used"] = True
+                return result
+            print(f"[content-extract] MinerU failed for whitelisted domain, trying probe: {mineru_result.get('reason', '')}", file=sys.stderr)
 
-    # Step 3: Probe with trafilatura
-    probe_result = probe_url(url)
-    if probe_result["ok"]:
-        result.update(probe_result)
-        result["url"] = url
-        result["ok"] = True
-        return result
+        # Step 3: Probe with trafilatura (free, fastest)
+        probe_result = probe_url(url)
+        if probe_result["ok"]:
+            result.update(probe_result)
+            result["url"] = url
+            return result
+        print(f"[content-extract] Probe failed: {probe_result.get('reason', '')}", file=sys.stderr)
 
-    # Step 4: Probe failed -> MinerU fallback (if token is configured)
-    print(f"[content-extract] Probe failed: {probe_result.get('reason', '')}, trying MinerU fallback", file=sys.stderr)
-    mineru_result = _mineru_extract(url, model=mineru_model, max_chars=max_chars)
-    if mineru_result["ok"]:
-        result.update(mineru_result)
-        result["url"] = url
-        result["fallback_used"] = True
-        return result
-
-    # Step 5: Tavily Extract fallback (cloud-based rendering)
-    print(f"[content-extract] MinerU failed: {mineru_result.get('reason', '')}, trying Tavily Extract", file=sys.stderr)
+    # Step 4: Tavily Extract (cloud rendering, fast for anti-crawl/JS pages)
+    print(f"[content-extract] Trying Tavily Extract", file=sys.stderr)
     tavily_result = _tavily_extract(url)
     if tavily_result["ok"]:
         result.update(tavily_result)
@@ -432,7 +426,7 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         _apply_max_chars(result, max_chars)
         return result
 
-    # Step 6: Exa Contents fallback (cache-first with live crawl)
+    # Step 5: Exa Contents (cache-first with live crawl)
     print(f"[content-extract] Tavily failed: {tavily_result.get('reason', '')}, trying Exa Contents", file=sys.stderr)
     exa_result = _exa_extract(url)
     if exa_result["ok"]:
@@ -442,12 +436,22 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         _apply_max_chars(result, max_chars)
         return result
 
+    # Step 6: MinerU as last resort (skip if already tried in Step 1/2)
+    if mineru_result is None:
+        print(f"[content-extract] Exa failed: {exa_result.get('reason', '')}, trying MinerU", file=sys.stderr)
+        mineru_result = _mineru_extract(url, model=mineru_model, max_chars=max_chars)
+        if mineru_result["ok"]:
+            result.update(mineru_result)
+            result["url"] = url
+            result["fallback_used"] = True
+            return result
+
     # Step 7: Everything failed
     result["error"] = (
-        f"Probe: {probe_result.get('reason', 'unknown')}; "
-        f"MinerU: {mineru_result.get('reason', 'not attempted')}; "
+        f"Probe: {(probe_result or {}).get('reason', 'skipped')}; "
         f"Tavily: {tavily_result.get('reason', 'not attempted')}; "
-        f"Exa: {exa_result.get('reason', 'not attempted')}"
+        f"Exa: {exa_result.get('reason', 'not attempted')}; "
+        f"MinerU: {(mineru_result or {}).get('reason', 'not attempted')}"
     )
     return result
 

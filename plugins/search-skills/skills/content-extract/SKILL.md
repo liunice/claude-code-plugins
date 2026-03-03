@@ -2,40 +2,13 @@
 name: content-extract
 description: >
   Intelligent URL content extraction. Converts any URL to clean text/markdown using
-  a multi-layer approach: trafilatura fast probe -> heuristics check -> MinerU API fallback
-  -> Tavily Extract fallback -> Exa Contents fallback.
-  Use when you need to read the full content of a web page. Handles anti-crawl sites
-  (WeChat, Zhihu, Xiaohongshu, Cloudflare-protected) and binary files (PDF, Office docs)
-  automatically. Do NOT use WebFetch directly; always route through this skill.
+  a multi-layer approach: trafilatura fast probe -> Tavily Extract -> Exa Contents
+  -> MinerU API. Handles anti-crawl sites (WeChat, Zhihu, Xiaohongshu, Cloudflare-protected)
+  and binary files (PDF, Office docs) automatically.
+  Do NOT use WebFetch directly; always route through this skill.
 ---
 
 # Content Extract — Intelligent URL -> Text/Markdown
-
-## Decision Tree
-
-```
-URL input
-    |
-[1] Binary file? (PDF/Office/image) --yes--> MinerU directly
-    |no
-[2] Domain whitelist? (WeChat/Zhihu/etc) --yes--> MinerU directly
-    |no
-[3] Probe: requests + trafilatura
-    |
-[4] Heuristics check:
-    - Anti-crawl keywords detected? -> fail
-    - Content < 800 chars? -> fail
-    |pass
-    Return content
-    |fail
-[5] MINERU_TOKEN configured? --yes--> MinerU fallback
-    |fail or no
-[6] TAVILY_API_KEY configured? --yes--> Tavily Extract (cloud rendering)
-    |fail or no
-[7] EXA_API_KEY configured? --yes--> Exa Contents (cache + live crawl)
-    |fail or no
-    Return error with all failure reasons
-```
 
 ## Usage
 
@@ -75,44 +48,13 @@ On failure:
 {
   "ok": false,
   "url": "https://...",
-  "error": "Probe: Anti-crawl page detected; MinerU: ...; Tavily: ...; Exa: ..."
+  "error": "Probe: Anti-crawl page detected; Tavily: ...; Exa: ...; MinerU: ..."
 }
 ```
 
-## Domain Whitelist
+## Key Behaviors
 
-Sites that always route to MinerU (anti-crawl / JS-rendered):
-- `mp.weixin.qq.com` — WeChat articles
-- `zhihu.com` / `zhuanlan.zhihu.com` — Zhihu
-- `xiaohongshu.com` / `xhslink.com` — Xiaohongshu
-- `bilibili.com` — Bilibili
-
-> See `references/domain-whitelist.md` for the full list.
-
-## Anti-Crawl Heuristics
-
-Probe extraction is considered failed if:
-1. Response contains anti-crawl keywords (CAPTCHA, "enable javascript", etc.)
-2. Extracted content is shorter than 800 characters
-
-> See `references/heuristics.md` for the full heuristics reference.
-
-## Extraction Layers
-
-| Layer | Method | When used |
-|-------|--------|-----------|
-| 1 | trafilatura | Primary extractor, best for article-style pages |
-| 2 | BeautifulSoup | Fallback when trafilatura extracts < 200 chars |
-| 3 | Regex strip | Last resort when BS4 is unavailable |
-| 4 | MinerU API | Anti-crawl/binary fallback (requires MINERU_TOKEN) |
-| 5 | Tavily Extract | Cloud rendering fallback for JS/anti-crawl pages (requires TAVILY_API_KEY) |
-| 6 | Exa Contents | Cache-first with live crawl fallback (requires EXA_API_KEY) |
-
-## Dependencies
-
-- `requests` — HTTP client
-- `trafilatura` — Primary content extractor
-- `beautifulsoup4` + `lxml` — Fallback extractor
-- `MINERU_TOKEN` env var — Optional, for MinerU fallback
-- `TAVILY_API_KEY` env var — Optional, for Tavily Extract fallback
-- `EXA_API_KEY` env var — Optional, for Exa Contents fallback
+- **Normal URLs**: Automatically tries multiple extraction methods in sequence until one succeeds.
+- **Binary files** (PDF, Office, images): Prioritizes MinerU for structure-preserving extraction.
+- **Anti-crawl sites** (WeChat, Zhihu, Cloudflare-protected): Automatically detected and routed to cloud-based extractors.
+- All fallback logic is handled internally — just pass the URL and read the result.
