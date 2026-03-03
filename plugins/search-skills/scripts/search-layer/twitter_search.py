@@ -79,6 +79,10 @@ def _api_get(endpoint: str, api_key: str, params: dict, timeout: int = 30) -> di
         params=params,
         timeout=timeout,
     )
+    if r.status_code in (401, 402, 403, 429):
+        raise RuntimeError(
+            f"Twitter API error (HTTP {r.status_code}): API key may be invalid, "
+            "expired, or quota exceeded. Please check TWITTER_API_KEY and account billing.")
     r.raise_for_status()
     return r.json()
 

@@ -344,6 +344,10 @@ def search_brave(query: str, key: str, num: int = 5,
             params=params,
             timeout=timeout,
         )
+        if r.status_code in (401, 402, 403, 429):
+            raise RuntimeError(
+                f"Brave API error (HTTP {r.status_code}): API key may be invalid, "
+                "expired, or quota exceeded. Please check BRAVE_API_KEY and account billing.")
         r.raise_for_status()
         data = r.json()
         results = []
@@ -417,6 +421,10 @@ def search_grok(query: str, api_url: str, api_key: str, model: str = "grok-4.20-
             json=payload,
             timeout=timeout,
         )
+        if r.status_code in (401, 402, 403, 429):
+            raise RuntimeError(
+                f"Grok API error (HTTP {r.status_code}): API key may be invalid, "
+                "expired, or quota exceeded. Please check XAI_API_KEY and account billing.")
         r.raise_for_status()
 
         # Detect SSE via Content-Type header or body prefix
@@ -532,6 +540,10 @@ def search_exa(query: str, key: str, num: int = 5, timeout: int = 30) -> list:
             json={"query": query, "numResults": num, "type": "auto"},
             timeout=timeout,
         )
+        if r.status_code in (401, 402, 403, 429):
+            raise RuntimeError(
+                f"Exa API error (HTTP {r.status_code}): API key may be invalid, "
+                "expired, or quota exceeded. Please check EXA_API_KEY and account billing.")
         r.raise_for_status()
         results = []
         for res in r.json().get("results", []):
@@ -572,6 +584,10 @@ def search_tavily(query: str, key: str, num: int = 5,
             json={"api_key": key, **payload},
             timeout=timeout,
         )
+        if r.status_code in (401, 402, 403, 429):
+            raise RuntimeError(
+                f"Tavily API error (HTTP {r.status_code}): API key may be invalid, "
+                "expired, or quota exceeded. Please check TAVILY_API_KEY and account billing.")
         r.raise_for_status()
         data = r.json()
         results = []

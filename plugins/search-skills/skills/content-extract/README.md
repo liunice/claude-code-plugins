@@ -43,7 +43,7 @@ flowchart TD
 | Method | Type | Speed | Cost | Best For |
 |--------|------|-------|------|----------|
 | **Probe** (trafilatura / bs4 / regex) | Local | Fastest | Free | Standard HTML pages |
-| **Exa Contents** | Cloud API | Fast (cached) | Paid | Anti-crawl pages; cached content |
+| **Exa Contents** | Cloud API | Fast (cached) | Paid | Cached pages; live crawl fallback |
 | **Tavily Extract** | Cloud API | Fast | Paid | JS-rendered pages |
 | **MinerU** | Cloud API | Slow (async polling) | Paid | PDFs, Office docs, OCR, table extraction |
 
@@ -51,7 +51,7 @@ flowchart TD
 
 - **Probe first for normal URLs**: Most pages are standard HTML. Using the free local extractor avoids unnecessary API calls.
 - **MinerU first for binary/whitelisted**: MinerU produces the highest-quality output for documents (preserving structure, tables, and formulas) and for specific anti-crawl sites it's been optimized for.
-- **Exa before Tavily**: Exa's cache-first approach often has pre-indexed content for popular pages, bypassing anti-crawl without real-time rendering. Tavily serves as fallback for pages Exa hasn't cached.
+- **Exa before Tavily**: Exa uses a cache-first approach with live crawl fallback. Tavily provides cloud rendering as an additional fallback.
 - **MinerU last for normal URLs**: When probe and cloud services fail, MinerU's document parsing engine is tried as last resort.
 - **No duplicate MinerU calls**: If MinerU was already tried in the binary/whitelist step, it's skipped in the fallback chain.
 

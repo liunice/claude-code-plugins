@@ -43,7 +43,7 @@ Use `requests` + trafilatura/bs4/regex to extract content locally.
 
 **Step 4 — Exa Contents**
 
-Cache-first with live crawl fallback. Better for anti-crawl pages. Requires `EXA_API_KEY`.
+Cache-first with live crawl fallback. Requires `EXA_API_KEY`.
 
 **Step 5 — Tavily Extract**
 

@@ -8,7 +8,7 @@ Extraction paths (optimized by URL type):
   Normal URLs:     Probe -> Exa -> Tavily -> MinerU
 
   - Probe: requests + trafilatura/bs4/regex (free, fastest)
-  - Exa Contents: cache-first with live crawl fallback (better for anti-crawl)
+  - Exa Contents: cache-first with live crawl fallback
   - Tavily Extract: cloud rendering for JS-rendered pages
   - MinerU: best for binary files (preserves tables/formulas/OCR)
 
@@ -268,6 +268,14 @@ def _mineru_extract(url: str, model: str | None = None, max_chars: int = 20000) 
         else:
             return {"ok": False, "reason": "MinerU produced no markdown output"}
     except Exception as e:
+        # Check if the root cause is an HTTP auth/quota error
+        import urllib.error
+        cause = e.__cause__
+        status = getattr(cause, "code", None) if isinstance(cause, urllib.error.HTTPError) else None
+        if status in (401, 402, 403, 429):
+            return {"ok": False, "reason": f"MinerU API error (HTTP {status}): "
+                    "MINERU_TOKEN may be invalid, expired, or quota exceeded. "
+                    "Please check your MinerU account billing."}
         return {"ok": False, "reason": f"MinerU extraction failed: {e}"}
 
 
@@ -293,6 +301,10 @@ def _tavily_extract(url: str) -> dict:
             json={"api_key": api_key, "urls": [url]},
             timeout=60,
         )
+        if resp.status_code in (401, 402, 403, 429):
+            return {"ok": False, "reason": f"Tavily API error (HTTP {resp.status_code}): "
+                    "API key may be invalid, expired, or quota exceeded. "
+                    "Please check your TAVILY_API_KEY and account billing."}
         resp.raise_for_status()
         data = resp.json()
         results = data.get("results", [])
@@ -332,6 +344,10 @@ def _exa_extract(url: str) -> dict:
             json={"urls": [url], "text": True},
             timeout=60,
         )
+        if resp.status_code in (401, 402, 403, 429):
+            return {"ok": False, "reason": f"Exa API error (HTTP {resp.status_code}): "
+                    "API key may be invalid, expired, or quota exceeded. "
+                    "Please check your EXA_API_KEY and account billing."}
         resp.raise_for_status()
         data = resp.json()
         results = data.get("results", [])
@@ -416,7 +432,7 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
             return result
         print(f"[content-extract] Probe failed: {probe_result.get('reason', '')}", file=sys.stderr)
 
-    # Step 4: Exa Contents (cache-first with live crawl, better for anti-crawl pages)
+    # Step 4: Exa Contents (cache-first with live crawl fallback)
     print(f"[content-extract] Trying Exa Contents", file=sys.stderr)
     exa_result = _exa_extract(url)
     if exa_result["ok"]:
