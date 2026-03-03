@@ -1,51 +1,36 @@
 #!/usr/bin/env python3
 """
-PreToolUse hook: intercept WebFetch and redirect to content_extract.py.
+PreToolUse hook: intercept WebFetch and redirect to the content-extract skill.
 
 Reads tool_input from stdin (JSON with tool_input.url), denies the call,
-and provides a ready-to-use Bash command in permissionDecisionReason.
+and directs the AI to use the content-extract skill instead.
 """
 
 import json
-import os
 import sys
 
 
 def main():
     try:
         data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
-        print(json.dumps({"decision": "allow"}))
-        return
-
-    tool_input = data.get("tool_input", {})
-    url = tool_input.get("url", "")
+        url = data["tool_input"]["url"]
+    except (KeyError, json.JSONDecodeError, EOFError) as err:
+        print(f"hook-error: {err}", file=sys.stderr)
+        sys.exit(1)
 
     if not url:
-        print(json.dumps({"decision": "allow"}))
-        return
+        sys.exit(0)
 
-    # Build the content_extract.py command
-    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT", "")
-    script_path = os.path.join(plugin_root, "scripts", "content-extract", "content_extract.py")
-
-    # Escape single quotes in URL for shell safety
-    safe_url = url.replace("'", "'\\''")
-
-    cmd = f"python3 '{script_path}' --url '{safe_url}'"
-
-    reason = (
-        f"Use the search-skills plugin instead. Run this command:\n\n"
-        f"```bash\n{cmd}\n```\n\n"
-        f"The script extracts content using trafilatura (fast probe), "
-        f"with automatic MinerU fallback for anti-crawl sites and PDFs. "
-        f"Returns JSON with title, content, content_length, and method used."
-    )
+    reason = f"Please use the Skill tool to invoke 'search-skills:content-extract' with args: '{url}'"
 
     print(json.dumps({
-        "decision": "deny",
-        "permissionDecisionReason": reason,
-    }))
+        "systemMessage": "WebFetch intercepted. Use the search-skills plugin instead.",
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }, separators=(',', ':')))
 
 
 if __name__ == "__main__":
