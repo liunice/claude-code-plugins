@@ -53,7 +53,9 @@ Run `/search-skills:setup` for guided configuration, or see `.env.example` for t
 |----------|----------|---------|-------------|
 | `BRAVE_API_KEY` | At least one of four | — | [Brave Search API](https://brave.com/search/api/) key |
 | `EXA_API_KEY` | At least one of four | — | [Exa](https://exa.ai) API key |
+| `EXA_API_URL` | No | `https://api.exa.ai` | Exa API base URL |
 | `TAVILY_API_KEY` | At least one of four | — | [Tavily](https://tavily.com) API key |
+| `TAVILY_API_URL` | No | `https://api.tavily.com` | Tavily API base URL |
 | `GROK_API_KEY` | At least one of four | — | [xAI Grok](https://docs.x.ai/docs/overview) API key |
 | `GROK_API_URL` | No | `https://api.x.ai/v1` | Grok API base URL (OpenAI-compatible endpoint) |
 | `GROK_MODEL` | No | `grok-4.20-beta` | Grok model name |
@@ -100,7 +102,7 @@ The `search-layer` skill classifies query intent and picks the appropriate mode 
 | Skill | Description |
 |-------|-------------|
 | `search-layer` | Full search protocol: intent classification → query expansion → multi-source retrieval → scoring → synthesis |
-| `content-extract` | URL content extraction decision tree: whitelist → probe → MinerU / Tavily / Exa fallback |
+| `content-extract` | URL content extraction with multi-layer fallback: whitelist → trafilatura probe → Exa → Tavily → MinerU |
 | `mineru-extract` | MinerU API usage: model selection, parameters, output handling |
 
 ## Upstream
