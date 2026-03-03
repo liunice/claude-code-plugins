@@ -99,7 +99,7 @@ Add your key(s) to ~/.claude/settings.json under the "env" field:
 }
 
 Where to get keys:
-- Brave:   https://brave.com/search/api/  (free tier available, card required)
+- Brave:   https://brave.com/search/api/
 - Exa:     https://exa.ai
 - Tavily:  https://tavily.com
 - Grok:    https://docs.x.ai/docs/overview  (OpenAI-compatible API)

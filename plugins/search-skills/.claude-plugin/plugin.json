@@ -1,7 +1,7 @@
 {
   "name": "search-skills",
   "version": "1.1.0",
-  "description": "Multi-source search (Brave+Exa+Tavily+Grok+Twitter) with intelligent content extraction (trafilatura+MinerU). Intercepts WebSearch/WebFetch and routes to Python scripts.",
+  "description": "Multi-source search (Brave+Exa+Tavily+Grok+Twitter) with intent-aware scoring and multi-layer content extraction (trafilatura+Exa+Tavily+MinerU). Intercepts WebSearch/WebFetch and routes to Python scripts.",
   "author": {
     "name": "liunice"
   },

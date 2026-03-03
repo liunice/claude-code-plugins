@@ -11,7 +11,7 @@
     {
       "name": "search-skills",
       "source": "./plugins/search-skills",
-      "description": "Multi-source search (Brave+Exa+Tavily+Grok) with intelligent content extraction (trafilatura+MinerU)"
+      "description": "Multi-source search (Brave+Exa+Tavily+Grok+Twitter) with intent-aware scoring and multi-layer content extraction (trafilatura+Exa+Tavily+MinerU)"
     }
   ]
 }
