@@ -9,7 +9,7 @@ flowchart TD
     A[URL input] --> B{Binary file?<br/>PDF/Office/image}
     B -- yes --> M1[MinerU<br/>preserves structure]
     M1 -- ok --> R1([return])
-    M1 -- fail --> T
+    M1 -- fail --> E
 
     B -- no --> C{Domain whitelist?<br/>WeChat/Zhihu/etc}
     C -- yes --> M2[MinerU]
@@ -18,12 +18,12 @@ flowchart TD
 
     C -- no --> P[Probe: trafilatura / bs4 / regex]
     P -- pass --> R3([return])
-    P -- fail --> T
+    P -- fail --> E
 
-    T[Tavily Extract<br/>cloud rendering] -- ok --> R4([return])
-    T -- fail --> E[Exa Contents<br/>cache + live crawl]
-    E -- ok --> R5([return])
-    E -- fail --> D{MinerU already<br/>tried?}
+    E[Exa Contents<br/>cache + live crawl] -- ok --> R4([return])
+    E -- fail --> T[Tavily Extract<br/>cloud rendering]
+    T -- ok --> R5([return])
+    T -- fail --> D{MinerU already<br/>tried?}
     D -- no --> M3[MinerU<br/>last resort]
     M3 -- ok --> R6([return])
     M3 -- fail --> ERR([error])
@@ -34,24 +34,25 @@ flowchart TD
 
 | URL Type | Fallback Order | Rationale |
 |----------|----------------|-----------|
-| **Binary files** (PDF, Office, images) | MinerU → Tavily → Exa | MinerU preserves document structure (tables, formulas, OCR) |
-| **Whitelisted domains** (WeChat, Zhihu, etc.) | MinerU → Probe → Tavily → Exa | These anti-crawl sites are specifically optimized for MinerU |
-| **Normal URLs** | Probe → Tavily → Exa → MinerU | Free/fast probe first; cloud rendering for anti-crawl; MinerU as last resort |
+| **Binary files** (PDF, Office, images) | MinerU → Exa → Tavily | MinerU preserves document structure (tables, formulas, OCR) |
+| **Whitelisted domains** (WeChat, Zhihu, etc.) | MinerU → Probe → Exa → Tavily | These anti-crawl sites are specifically optimized for MinerU |
+| **Normal URLs** | Probe → Exa → Tavily → MinerU | Free/fast probe first; Exa cache for anti-crawl; MinerU as last resort |
 
 ## Extraction Methods
 
 | Method | Type | Speed | Cost | Best For |
 |--------|------|-------|------|----------|
 | **Probe** (trafilatura / bs4 / regex) | Local | Fastest | Free | Standard HTML pages |
-| **Tavily Extract** | Cloud API | Fast | Paid | Anti-crawl / JS-rendered pages |
-| **Exa Contents** | Cloud API | Fast (cached) | Paid | Indexed pages; live crawl fallback |
+| **Exa Contents** | Cloud API | Fast (cached) | Paid | Anti-crawl pages; cached content |
+| **Tavily Extract** | Cloud API | Fast | Paid | JS-rendered pages |
 | **MinerU** | Cloud API | Slow (async polling) | Paid | PDFs, Office docs, OCR, table extraction |
 
 ## Design Decisions
 
 - **Probe first for normal URLs**: Most pages are standard HTML. Using the free local extractor avoids unnecessary API calls.
 - **MinerU first for binary/whitelisted**: MinerU produces the highest-quality output for documents (preserving structure, tables, and formulas) and for specific anti-crawl sites it's been optimized for.
-- **MinerU last for normal URLs**: When probe fails on a normal URL (typically due to anti-crawl), cloud rendering services (Tavily/Exa) are faster and better suited than MinerU's document parsing engine.
+- **Exa before Tavily**: Exa's cache-first approach often has pre-indexed content for popular pages, bypassing anti-crawl without real-time rendering. Tavily serves as fallback for pages Exa hasn't cached.
+- **MinerU last for normal URLs**: When probe and cloud services fail, MinerU's document parsing engine is tried as last resort.
 - **No duplicate MinerU calls**: If MinerU was already tried in the binary/whitelist step, it's skipped in the fallback chain.
 
 ## Anti-Crawl Detection
@@ -61,7 +62,7 @@ The probe step includes heuristic checks that trigger fallback:
 1. **Keyword detection** — Response contains known anti-crawl phrases (e.g., "enable javascript", "checking your browser", "captcha")
 2. **Minimum length** — Extracted content shorter than 800 characters is considered incomplete
 
-See [`references/heuristics.md`](../../references/heuristics.md) for the full keyword list.
+See `_ANTICRAWL_KEYWORDS` in [`content_extract.py`](../../scripts/content-extract/content_extract.py) for the full keyword list.
 
 ## Domain Whitelist
 

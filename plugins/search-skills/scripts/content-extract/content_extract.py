@@ -3,13 +3,13 @@
 Intelligent content extraction: URL -> clean Markdown/text.
 
 Extraction paths (optimized by URL type):
-  Binary files:    MinerU -> Tavily -> Exa
-  Whitelisted:     MinerU -> Probe -> Tavily -> Exa
-  Normal URLs:     Probe -> Tavily -> Exa -> MinerU
+  Binary files:    MinerU -> Exa -> Tavily
+  Whitelisted:     MinerU -> Probe -> Exa -> Tavily
+  Normal URLs:     Probe -> Exa -> Tavily -> MinerU
 
   - Probe: requests + trafilatura/bs4/regex (free, fastest)
-  - Tavily Extract: cloud rendering for anti-crawl/JS pages
-  - Exa Contents: cache-first with live crawl fallback
+  - Exa Contents: cache-first with live crawl fallback (better for anti-crawl)
+  - Tavily Extract: cloud rendering for JS-rendered pages
   - MinerU: best for binary files (preserves tables/formulas/OCR)
 
 Usage:
@@ -59,7 +59,7 @@ def _load_whitelist() -> set:
         try:
             for line in _WHITELIST_PATH.read_text().splitlines():
                 line = line.strip()
-                if line and not line.startswith("#") and not line.startswith("-"):
+                if line and not line.startswith("#"):
                     # Handle markdown list items: "- domain.com" or "* domain.com"
                     cleaned = re.sub(r'^[-*]\s*', '', line).strip()
                     # Handle markdown bold/code: "**domain.com**" or "`domain.com`"
@@ -416,18 +416,8 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
             return result
         print(f"[content-extract] Probe failed: {probe_result.get('reason', '')}", file=sys.stderr)
 
-    # Step 4: Tavily Extract (cloud rendering, fast for anti-crawl/JS pages)
-    print(f"[content-extract] Trying Tavily Extract", file=sys.stderr)
-    tavily_result = _tavily_extract(url)
-    if tavily_result["ok"]:
-        result.update(tavily_result)
-        result["url"] = url
-        result["fallback_used"] = True
-        _apply_max_chars(result, max_chars)
-        return result
-
-    # Step 5: Exa Contents (cache-first with live crawl)
-    print(f"[content-extract] Tavily failed: {tavily_result.get('reason', '')}, trying Exa Contents", file=sys.stderr)
+    # Step 4: Exa Contents (cache-first with live crawl, better for anti-crawl pages)
+    print(f"[content-extract] Trying Exa Contents", file=sys.stderr)
     exa_result = _exa_extract(url)
     if exa_result["ok"]:
         result.update(exa_result)
@@ -436,9 +426,19 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
         _apply_max_chars(result, max_chars)
         return result
 
+    # Step 5: Tavily Extract (cloud rendering)
+    print(f"[content-extract] Exa failed: {exa_result.get('reason', '')}, trying Tavily Extract", file=sys.stderr)
+    tavily_result = _tavily_extract(url)
+    if tavily_result["ok"]:
+        result.update(tavily_result)
+        result["url"] = url
+        result["fallback_used"] = True
+        _apply_max_chars(result, max_chars)
+        return result
+
     # Step 6: MinerU as last resort (skip if already tried in Step 1/2)
     if mineru_result is None:
-        print(f"[content-extract] Exa failed: {exa_result.get('reason', '')}, trying MinerU", file=sys.stderr)
+        print(f"[content-extract] Tavily failed: {tavily_result.get('reason', '')}, trying MinerU", file=sys.stderr)
         mineru_result = _mineru_extract(url, model=mineru_model, max_chars=max_chars)
         if mineru_result["ok"]:
             result.update(mineru_result)
@@ -449,8 +449,8 @@ def extract(url: str, mineru_model: str | None = None, max_chars: int = 20000) -
     # Step 7: Everything failed
     result["error"] = (
         f"Probe: {(probe_result or {}).get('reason', 'skipped')}; "
-        f"Tavily: {tavily_result.get('reason', 'not attempted')}; "
         f"Exa: {exa_result.get('reason', 'not attempted')}; "
+        f"Tavily: {tavily_result.get('reason', 'not attempted')}; "
         f"MinerU: {(mineru_result or {}).get('reason', 'not attempted')}"
     )
     return result
